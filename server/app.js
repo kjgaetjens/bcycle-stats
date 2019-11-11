@@ -1,9 +1,13 @@
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const mustacheExpress = require('mustache-express')
 const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
+
+//will update PORT once hosted
+const PORT = 8080
 
 // Middleware
 // Don't technically need all of this middleware, but including in case I build out a client app
@@ -11,21 +15,28 @@ app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
 
-//will update PORT once hosted
-const PORT = 8080
+// Use Mustache templating engine
+app.engine('mustache',mustacheExpress())
+app.set('views','./views')
+app.set('view engine','mustache')
 
 // MongoDB connection params
 const MONGO_USERNAME = process.env.MONGO_USERNAME
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD
 const MONGO_DATABASE = process.env.MONGO_DATABASE
 
-// reorg with router if enough time
-
 // Connect to MongoDB
 mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
         console.log('Successfully connected to MongoDB database')
         const db = client.db('test')
+
+        //Client admin page for creating collections and refreshing scratch data
+        app.get('/', async (req,res) => {
+            let results = await db.collection('collection-names').find({}).toArray()
+            let collectionNames = results.map(result => result.name)
+            res.render('clientAdmin', {collectionNames: collectionNames})
+        })
 
         //Delete current MongoDB rail stop and bicycle station data. Pull current rail stop and bicycle station data and add to MonogDB.
         //Should be triggered through interface
@@ -38,15 +49,21 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             await db.collection('scratch-bicyclestations').deleteMany({})
             await db.collection('scratch-bicyclestations').insertMany(bicycleStationResult.data.features)
 
-            //update
-            res.send('success')
+            res.redirect('/')
         })
 
         //Should be triggered through interface with regex validation on chars entered
         app.post('/create-collection', async (req, res) => {
-            //add validation to check to see if collection name already exists to prevent overwriting
-            let collectionName = req.body.name
-            if(collectionName){
+            let collectionName = (req.body.name).toLowerCase()
+
+            //pull existing collection names to prevent duplicates
+            let results = await db.collection('collection-names').find({}).toArray()
+            let existingNames = results.map(result => result.name)
+
+            //if collection name is not a duplicate, create new collections and populate with current rail stop and bicycle station data
+            if(collectionName && !(existingNames.includes(collectionName))){
+                await db.collection('collection-names').insertOne({name: collectionName})
+
                 let railStopResult = await axios('https://opendata.arcgis.com/datasets/c2274084571d4f968cac09a608b868c4_2.geojson')
                 await db.collection(`${collectionName}-railstops`).deleteMany({})
                 await db.collection(`${collectionName}-railstops`).insertMany(railStopResult.data.features)
@@ -54,12 +71,15 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
                 let bicycleStationResult = await axios('https://opendata.arcgis.com/datasets/1dc7a23374ac44cdae8553044bfeaf22_2.geojson')
                 await db.collection(`${collectionName}-bicyclestations`).deleteMany({})
                 await db.collection(`${collectionName}-bicyclestations`).insertMany(bicycleStationResult.data.features)
+            } else {
+                //would actually return an object that  can be used as an error alert given more time
+                console.log('collection name is invalid or already exists')
             }
-            //else return error message
 
-            //update
-            res.send('success')
+            res.redirect('/')
         })
+
+
 
         // API to pull stats on rail stops
         app.get('/rail-stop-stats/:collection/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {

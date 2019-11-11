@@ -1,0 +1,33 @@
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <h1>Refresh Scratch Data</h1>
+        Refresh the Metro rail and Bcycle station data in the scratch database.
+        <br/><br/>
+        <form id="refreshScratchData" action="./refresh-scratch-data" method="POST">
+            <label>Refresh Scratch Data:</label>
+            <input type="submit" value="Refresh">
+        </form>
+
+        <h1>Create Collection</h1>
+        Create a new database collection. This database collection will contain point-in-time Metro rail and Bcycle station data that will never be refreshed. Your collection name will be used for the related APIs.
+        <br/>
+        {{! would normally add regex validation to input fields }}
+        Please use alphanumeric characters (eg. abCD1234) and hyphens (-) only.
+        <br/><br/>
+        <form id="createCollection" action="./create-collection" method="POST">
+            <label for="collection-name">Collection Name:</label>
+            <input id="collection-name" type="text" name="name">
+            <input type="submit" value="Submit">
+        </form>
+
+        <h1>Existing Collections</h1>
+        <ul>
+        {{#collectionNames}}
+            <li>{{.}}</li>
+        {{/collectionNames}}
+        </ul>
+    </body>
+</html>
