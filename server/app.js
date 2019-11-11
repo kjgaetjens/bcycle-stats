@@ -5,10 +5,10 @@ const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
 
-//Middleware
+// Middleware
+// Don't technically need all of this middleware, but including in case I build out a client app
 app.use(cors())
 app.use(express.json())
-//not sure if i'll need this parser actually
 app.use(express.urlencoded({extended: true}))
 
 //will update PORT once hosted
@@ -27,13 +27,9 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
         console.log('Successfully connected to MongoDB database')
         const db = client.db('test')
 
-        //Delete current MongoDB bus stop, rail stop, and bicycle station data. Pull current bus stop, rail stop, and bicycle station data and add to MonogDB.
+        //Delete current MongoDB rail stop and bicycle station data. Pull current rail stop and bicycle station data and add to MonogDB.
         app.post('/refresh-data', async (req, res) => {
             //add error handling
-        
-            let busStopResult = await axios('https://opendata.arcgis.com/datasets/1dc7a23374ac44cdae8553044bfeaf22_9.geojson')
-            await db.collection('busstops').deleteMany({})
-            await db.collection('busstops').insertMany(busStopResult.data.features)
 
             let railStopResult = await axios('https://opendata.arcgis.com/datasets/c2274084571d4f968cac09a608b868c4_2.geojson')
             await db.collection('railstops').deleteMany({})
@@ -47,16 +43,24 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             res.send('success')
         })
 
-        //add code here for the stats...can use similar code to get info
-
-        //API to pull every bus stop with associated nearest bicycle station information
-        //This is dependent on a consistent data structure when the API dataset is updated
-        //Need to resolve the load issue here...looks like it's timing out before finishing with this many bus stops
-        app.get('/bus-stop-info', async (req, res) => {
-            db.collection('bicyclestations').createIndex( { geometry: "2dsphere" } )
+        // API to pull stats on rail stops
+        app.get('/rail-stop-stats/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
+            db.collection('bicyclestations').createIndex( { geometry: "2dsphere" })
+            minDistance = parseInt(req.params.mindistance)
+            maxDistance = parseInt(req.params.maxdistance)
             
-            let nearbyInfo = []
-            let results = await db.collection('busstops').find({}).toArray()
+            let results = await db.collection('railstops').find({}).toArray()
+
+            let stopsTotal = results.length
+            let stopsWithBicycles = 0
+            
+            let redStopsTotal = 0
+            let redStopsWithBicycles = 0
+            let greenStopsTotal = 0
+            let greenStopsWithBicycles = 0
+            let purpleStopsTotal = 0
+            let purpleStopsWithBicycles = 0
+
             for (let i=0; i<results.length; i++) {
                 let nearbyStation = await db.collection('bicyclestations').findOne(
                     {
@@ -65,36 +69,66 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
                             {
                                 $geometry: results[i].geometry,
                                 //update to use url params for variable params
-                                $minDistance: 0,
-                                $maxDistance: 1000
+                                $minDistance: minDistance,
+                                $maxDistance: maxDistance
                             }
                         }
                     }
                 )
 
                 if (nearbyStation) {
-                    nearbyObject = {
-                        ...results[i],
-                        nearbyBicycle: {...nearbyStation}
-                    }
-                    nearbyInfo.push(nearbyObject)
-                } else {
-                    nearbyObject = {
-                        ...results[i],
-                        nearbyBicycle: null
-                    }
-                    nearbyInfo.push(nearbyObject)
+                    stopsWithBicycles += 1
                 }
+                if (results[i].properties.LineColor.includes('Red')) {
+                    redStopsTotal += 1
+                    if (nearbyStation) {
+                        redStopsWithBicycles += 1
+                    }
+                }
+                if (results[i].properties.LineColor.includes('Green')) {
+                    greenStopsTotal += 1
+                    if (nearbyStation) {
+                        greenStopsWithBicycles += 1
+                    }
+                }
+                if (results[i].properties.LineColor.includes('Purple')) {
+                    purpleStopsTotal += 1
+                    if (nearbyStation) {
+                        purpleStopsWithBicycles += 1
+                    }
+                }
+
             }
                 
-            res.json({"busStopsNearbyInfo":nearbyInfo})
+            res.json({
+                "stopsTotal":stopsTotal,
+                "stopsWithBicycles":stopsWithBicycles,
+                "percentageWithBicycles":(stopsWithBicycles/stopsTotal)*100,
+                "redLine": {
+                    "stopsTotal":redStopsTotal,
+                    "stopsWithBicycles":redStopsWithBicycles,
+                    "percentageWithBicycles":(redStopsWithBicycles/redStopsTotal)*100
+                },
+                "greenLine": {
+                    "stopsTotal":greenStopsTotal,
+                    "stopsWithBicycles":greenStopsWithBicycles,
+                    "percentageWithBicycles":(greenStopsWithBicycles/greenStopsTotal)*100
+                },
+                "purpleLine": {
+                    "stopsTotal":purpleStopsTotal,
+                    "stopsWithBicycles":purpleStopsWithBicycles,
+                    "percentageWithBicycles":(purpleStopsWithBicycles/purpleStopsTotal)*100
+                }
+            })
         })
 
         //API to pull every rail stop with associated nearest bicycle station information
         //This is dependent on a consistent data structure when the API dataset is updated
-        app.get('/rail-stop-info', async (req, res) => {
+        app.get('/rail-stop-info/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
             db.collection('bicyclestations').createIndex( { geometry: "2dsphere" } )
-            
+            minDistance = parseInt(req.params.mindistance)
+            maxDistance = parseInt(req.params.maxdistance)
+
             let nearbyInfo = []
             let results = await db.collection('railstops').find({}).toArray()
             for (let i=0; i<results.length; i++) {
@@ -105,8 +139,8 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
                             {
                                 $geometry: results[i].geometry,
                                 //update to use url params for variable params
-                                $minDistance: 0,
-                                $maxDistance: 1000
+                                $minDistance: minDistance,
+                                $maxDistance: maxDistance
                             }
                         }
                     }
@@ -133,10 +167,6 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
     } else {
         console.log(error)
     }
-})
-
-app.get('/', (req, res) => {
-    res.send('test')
 })
 
 
