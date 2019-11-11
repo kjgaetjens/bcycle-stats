@@ -6,7 +6,7 @@ const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
 
-const PORT = 8080
+const PORT = process.env.PORT || 8080
 
 // Middleware
 // Don't technically need all of this middleware, but including in anticipation of building out front end
