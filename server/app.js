@@ -35,7 +35,8 @@ app.get('/', (req,res) => {
     let results = await db.collection('collection-names').find({}).toArray()
     let collectionNames = results.map(result => result.name)
     }
-    res.render('clientAdmin', {collectionNames: collectionNames})
+    })
+res.render('clientAdmin', {collectionNames: collectionNames})
 })
 
 // Connect to MongoDB (all routes contained within)
