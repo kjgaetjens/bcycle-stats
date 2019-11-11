@@ -28,28 +28,49 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
         const db = client.db('test')
 
         //Delete current MongoDB rail stop and bicycle station data. Pull current rail stop and bicycle station data and add to MonogDB.
-        app.post('/refresh-data', async (req, res) => {
-            //add error handling
-
+        //Should be triggered through interface
+        app.post('/refresh-scratch-data', async (req, res) => {
             let railStopResult = await axios('https://opendata.arcgis.com/datasets/c2274084571d4f968cac09a608b868c4_2.geojson')
-            await db.collection('railstops').deleteMany({})
-            await db.collection('railstops').insertMany(railStopResult.data.features)
+            await db.collection('scratch-railstops').deleteMany({})
+            await db.collection('scratch-railstops').insertMany(railStopResult.data.features)
 
             let bicycleStationResult = await axios('https://opendata.arcgis.com/datasets/1dc7a23374ac44cdae8553044bfeaf22_2.geojson')
-            await db.collection('bicyclestations').deleteMany({})
-            await db.collection('bicyclestations').insertMany(bicycleStationResult.data.features)
+            await db.collection('scratch-bicyclestations').deleteMany({})
+            await db.collection('scratch-bicyclestations').insertMany(bicycleStationResult.data.features)
+
+            //update
+            res.send('success')
+        })
+
+        //Should be triggered through interface with regex validation on chars entered
+        app.post('/create-collection', async (req, res) => {
+            //add validation to check to see if collection name already exists to prevent overwriting
+            let collectionName = req.body.name
+            if(collectionName){
+                let railStopResult = await axios('https://opendata.arcgis.com/datasets/c2274084571d4f968cac09a608b868c4_2.geojson')
+                await db.collection(`${collectionName}-railstops`).deleteMany({})
+                await db.collection(`${collectionName}-railstops`).insertMany(railStopResult.data.features)
+    
+                let bicycleStationResult = await axios('https://opendata.arcgis.com/datasets/1dc7a23374ac44cdae8553044bfeaf22_2.geojson')
+                await db.collection(`${collectionName}-bicyclestations`).deleteMany({})
+                await db.collection(`${collectionName}-bicyclestations`).insertMany(bicycleStationResult.data.features)
+            }
+            //else return error message
 
             //update
             res.send('success')
         })
 
         // API to pull stats on rail stops
-        app.get('/rail-stop-stats/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
-            db.collection('bicyclestations').createIndex( { geometry: "2dsphere" })
-            minDistance = parseInt(req.params.mindistance)
-            maxDistance = parseInt(req.params.maxdistance)
+        app.get('/rail-stop-stats/:collection/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
+            //add error handling for if collection doesnt exist
+            let collection = req.params.collection
+            let minDistance = parseInt(req.params.mindistance)
+            let maxDistance = parseInt(req.params.maxdistance)
+
+            db.collection(`${collection}-bicyclestations`).createIndex( { geometry: "2dsphere" })
             
-            let results = await db.collection('railstops').find({}).toArray()
+            let results = await db.collection(`${collection}-railstops`).find({}).toArray()
 
             let stopsTotal = results.length
             let stopsWithBicycles = 0
@@ -62,13 +83,12 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             let purpleStopsWithBicycles = 0
 
             for (let i=0; i<results.length; i++) {
-                let nearbyStation = await db.collection('bicyclestations').findOne(
+                let nearbyStation = await db.collection(`${collection}-bicyclestations`).findOne(
                     {
                         geometry:
                         { $near:
                             {
                                 $geometry: results[i].geometry,
-                                //update to use url params for variable params
                                 $minDistance: minDistance,
                                 $maxDistance: maxDistance
                             }
@@ -124,21 +144,23 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
 
         //API to pull every rail stop with associated nearest bicycle station information
         //This is dependent on a consistent data structure when the API dataset is updated
-        app.get('/rail-stop-info/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
-            db.collection('bicyclestations').createIndex( { geometry: "2dsphere" } )
-            minDistance = parseInt(req.params.mindistance)
-            maxDistance = parseInt(req.params.maxdistance)
+        app.get('/rail-stop-info/:collection/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
+            //add error handling for if collection doesnt exist
+            let collection = req.params.collection
+            let minDistance = parseInt(req.params.mindistance)
+            let maxDistance = parseInt(req.params.maxdistance)
+
+            db.collection(`${collection}-bicyclestations`).createIndex( { geometry: "2dsphere" } )
 
             let nearbyInfo = []
-            let results = await db.collection('railstops').find({}).toArray()
+            let results = await db.collection(`${collection}-railstops`).find({}).toArray()
             for (let i=0; i<results.length; i++) {
-                let nearbyStation = await db.collection('bicyclestations').findOne(
+                let nearbyStation = await db.collection(`${collection}-bicyclestations`).findOne(
                     {
                         geometry:
                         { $near:
                             {
                                 $geometry: results[i].geometry,
-                                //update to use url params for variable params
                                 $minDistance: minDistance,
                                 $maxDistance: maxDistance
                             }
