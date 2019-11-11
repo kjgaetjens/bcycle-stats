@@ -26,6 +26,18 @@ const MONGO_USERNAME = process.env.MONGO_USERNAME
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD
 const MONGO_DATABASE = process.env.MONGO_DATABASE
 
+app.get('/', async (req,res) => {
+    mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
+    if(!error) {
+        console.log('Successfully connected to MongoDB database')
+        const db = client.db(MONGO_DATABASE)
+
+    let results = await db.collection('collection-names').find({}).toArray()
+    let collectionNames = results.map(result => result.name)
+    res.render('clientAdmin', {collectionNames: collectionNames})
+    }
+})
+
 // Connect to MongoDB (all routes contained within)
 mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
