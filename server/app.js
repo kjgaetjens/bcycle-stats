@@ -19,6 +19,8 @@ const MONGO_USERNAME = process.env.MONGO_USERNAME
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD
 const MONGO_DATABASE = process.env.MONGO_DATABASE
 
+// reorg with router if enough time
+
 // Connect to MongoDB
 mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
@@ -45,40 +47,87 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             res.send('success')
         })
 
-        app.get('/rail-stop-stats', async (req, res) => {
+        //add code here for the stats...can use similar code to get info
+
+        //API to pull every bus stop with associated nearest bicycle station information
+        //This is dependent on a consistent data structure when the API dataset is updated
+        //Need to resolve the load issue here...looks like it's timing out before finishing with this many bus stops
+        app.get('/bus-stop-info', async (req, res) => {
             db.collection('bicyclestations').createIndex( { geometry: "2dsphere" } )
-
-            let railStopsNearbyInfo = []
-            await db.collection('bicyclestations').find({}).toArray( async function(err, results){
-                for (let i=0; i<results.length; i++) {
-                    let nearStation = await db.collection('bicyclestations').findOne(
-                        {
-                          geometry:
-                            { $near:
-                               {
-                                 $geometry: results[i].geometry,
-                                 $minDistance: 0,
-                                 $maxDistance: 1000
-                               }
+            
+            let nearbyInfo = []
+            let results = await db.collection('busstops').find({}).toArray()
+            for (let i=0; i<results.length; i++) {
+                let nearbyStation = await db.collection('bicyclestations').findOne(
+                    {
+                        geometry:
+                        { $near:
+                            {
+                                $geometry: results[i].geometry,
+                                //update to use url params for variable params
+                                $minDistance: 0,
+                                $maxDistance: 1000
                             }
-                        }, function(err, document){
-                            console.log(document)
                         }
-                     )
+                    }
+                )
+
+                if (nearbyStation) {
+                    nearbyObject = {
+                        ...results[i],
+                        nearbyBicycle: {...nearbyStation}
+                    }
+                    nearbyInfo.push(nearbyObject)
+                } else {
+                    nearbyObject = {
+                        ...results[i],
+                        nearbyBicycle: null
+                    }
+                    nearbyInfo.push(nearbyObject)
                 }
-            })
+            }
+                
+            res.json({"busStopsNearbyInfo":nearbyInfo})
+        })
 
+        //API to pull every rail stop with associated nearest bicycle station information
+        //This is dependent on a consistent data structure when the API dataset is updated
+        app.get('/rail-stop-info', async (req, res) => {
+            db.collection('bicyclestations').createIndex( { geometry: "2dsphere" } )
             
+            let nearbyInfo = []
+            let results = await db.collection('railstops').find({}).toArray()
+            for (let i=0; i<results.length; i++) {
+                let nearbyStation = await db.collection('bicyclestations').findOne(
+                    {
+                        geometry:
+                        { $near:
+                            {
+                                $geometry: results[i].geometry,
+                                //update to use url params for variable params
+                                $minDistance: 0,
+                                $maxDistance: 1000
+                            }
+                        }
+                    }
+                )
 
-                // for each coordinate, pull the nearest bicycle station within a certain distance (use near and return [0])
-
-                 //see what the find returns if it doesnt find anything...the next line will prob fail if nothing. should add a conditional
-
-                //need bus stop basic info, need bus route info, need boolean for if nearby stop, need nearby stop name 
-                //make sure that if the find doesn't return anything, it still fills in the relevant info 
-            
-            //update
-            res.send('success')
+                if (nearbyStation) {
+                    nearbyObject = {
+                        ...results[i],
+                        nearbyBicycle: {...nearbyStation}
+                    }
+                    nearbyInfo.push(nearbyObject)
+                } else {
+                    nearbyObject = {
+                        ...results[i],
+                        nearbyBicycle: null
+                    }
+                    nearbyInfo.push(nearbyObject)
+                }
+            }
+                
+            res.json({"railStopsNearbyInfo":nearbyInfo})
         })
 
     } else {
