@@ -5,6 +5,7 @@ const mustacheExpress = require('mustache-express')
 const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
+const path = require('path')
 global.rootdir = __dirname
 
 const PORT = process.env.PORT || 8080
