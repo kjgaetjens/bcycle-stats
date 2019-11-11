@@ -6,11 +6,10 @@ const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
 
-//will update PORT once hosted
 const PORT = 8080
 
 // Middleware
-// Don't technically need all of this middleware, but including in case I build out a client app
+// Don't technically need all of this middleware, but including in anticipation of building out front end
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
@@ -25,21 +24,21 @@ const MONGO_USERNAME = process.env.MONGO_USERNAME
 const MONGO_PASSWORD = process.env.MONGO_PASSWORD
 const MONGO_DATABASE = process.env.MONGO_DATABASE
 
-// Connect to MongoDB
+// Connect to MongoDB (all routes contained within)
 mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
         console.log('Successfully connected to MongoDB database')
         const db = client.db('test')
 
-        //Client admin page for creating collections and refreshing scratch data
+        // Server side client admin page for creating collections and refreshing scratch data
         app.get('/', async (req,res) => {
             let results = await db.collection('collection-names').find({}).toArray()
             let collectionNames = results.map(result => result.name)
             res.render('clientAdmin', {collectionNames: collectionNames})
         })
 
-        //Delete current MongoDB rail stop and bicycle station data. Pull current rail stop and bicycle station data and add to MonogDB.
-        //Should be triggered through interface
+        // Delete current scratch data. Pull current rail stop and bicycle station data and add to MonogDB.
+        // Triggered via client admin page
         app.post('/refresh-scratch-data', async (req, res) => {
             let railStopResult = await axios('https://opendata.arcgis.com/datasets/c2274084571d4f968cac09a608b868c4_2.geojson')
             await db.collection('scratch-railstops').deleteMany({})
@@ -52,15 +51,16 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             res.redirect('/')
         })
 
-        //Should be triggered through interface with regex validation on chars entered
+        // Create new MongoDB collections associated with name entered by user
+        // Triggered via client admin page
         app.post('/create-collection', async (req, res) => {
+            // CollectionName should have regex validation added
             let collectionName = (req.body.name).toLowerCase()
 
-            //pull existing collection names to prevent duplicates
             let results = await db.collection('collection-names').find({}).toArray()
             let existingNames = results.map(result => result.name)
 
-            //if collection name is not a duplicate, create new collections and populate with current rail stop and bicycle station data
+            // If collection name does not already exist, create new collections and populate with current rail stop and bicycle station data
             if(collectionName && !(existingNames.includes(collectionName))){
                 await db.collection('collection-names').insertOne({name: collectionName})
 
@@ -72,7 +72,7 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
                 await db.collection(`${collectionName}-bicyclestations`).deleteMany({})
                 await db.collection(`${collectionName}-bicyclestations`).insertMany(bicycleStationResult.data.features)
             } else {
-                //would actually return an object that  can be used as an error alert given more time
+                // Would normally return an object to use for alert message on client side
                 console.log('collection name is invalid or already exists')
             }
 
@@ -81,9 +81,9 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
 
 
 
-        // API to pull stats on rail stops
+        // API to pull stats on rail stops in respect to nearby bcycle stations
         app.get('/rail-stop-stats/:collection/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
-            //add error handling for if collection doesnt exist
+            // Would normally add error handling for if collection doesnt exist
             let collection = req.params.collection
             let minDistance = parseInt(req.params.mindistance)
             let maxDistance = parseInt(req.params.maxdistance)
@@ -102,6 +102,7 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             let purpleStopsTotal = 0
             let purpleStopsWithBicycles = 0
 
+            // Use MongoDB geoquery to find nearby bicycle stations for each rail stop
             for (let i=0; i<results.length; i++) {
                 let nearbyStation = await db.collection(`${collection}-bicyclestations`).findOne(
                     {
@@ -137,7 +138,6 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
                         purpleStopsWithBicycles += 1
                     }
                 }
-
             }
                 
             res.json({
@@ -162,10 +162,10 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
             })
         })
 
-        //API to pull every rail stop with associated nearest bicycle station information
-        //This is dependent on a consistent data structure when the API dataset is updated
+        //API to pull rail stop info with associated nearest bicycle station info
+        //This is dependent on a consistent data structure when the provider of the API dataset updates info
         app.get('/rail-stop-info/:collection/mindistance/:mindistance/maxdistance/:maxdistance', async (req, res) => {
-            //add error handling for if collection doesnt exist
+            // Would normally add error handling for if collection doesnt exist
             let collection = req.params.collection
             let minDistance = parseInt(req.params.mindistance)
             let maxDistance = parseInt(req.params.maxdistance)
@@ -174,6 +174,8 @@ mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-me
 
             let nearbyInfo = []
             let results = await db.collection(`${collection}-railstops`).find({}).toArray()
+
+            // Use MongoDB geoquery to find nearby bicycle stations for each rail stop
             for (let i=0; i<results.length; i++) {
                 let nearbyStation = await db.collection(`${collection}-bicyclestations`).findOne(
                     {
