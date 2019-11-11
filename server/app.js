@@ -5,6 +5,7 @@ const mustacheExpress = require('mustache-express')
 const mongo = require('mongodb').MongoClient
 const axios = require('axios')
 require('dotenv').config()
+global.rootdir = __dirname
 
 const PORT = process.env.PORT || 8080
 
@@ -16,7 +17,7 @@ app.use(express.urlencoded({extended: true}))
 
 // Use Mustache templating engine
 app.engine('mustache',mustacheExpress())
-app.set('views','./views')
+app.set('views', path.join(__dirname, 'views'))
 app.set('view engine','mustache')
 
 // MongoDB connection params
