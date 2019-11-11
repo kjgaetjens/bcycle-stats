@@ -28,7 +28,7 @@ const MONGO_DATABASE = process.env.MONGO_DATABASE
 mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
         console.log('Successfully connected to MongoDB database')
-        const db = client.db('test')
+        const db = client.db(MONGO_DATABASE)
 
         // Server side client admin page for creating collections and refreshing scratch data
         app.get('/', async (req,res) => {
