@@ -22,15 +22,19 @@ app.set('views', path.join(__dirname, 'views'))
 app.set('view engine','mustache')
 
 // MongoDB connection params
-const MONGO_USERNAME = process.env.MONGO_USERNAME
-const MONGO_PASSWORD = process.env.MONGO_PASSWORD
-const MONGO_DATABASE = process.env.MONGO_DATABASE
+// const MONGO_USERNAME = process.env.MONGO_USERNAME
+// const MONGO_PASSWORD = process.env.MONGO_PASSWORD
+// const MONGO_DATABASE = process.env.MONGO_DATABASE
+
+// MongoDB mLab connection param
+const MONGO_URI = process.env.MONGO_URI
+
 
 // Connect to MongoDB (all routes contained within)
-mongo.connect(`mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@bcycle-stats-mezgf.gcp.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority`, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
+mongo.connect(MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
     if(!error) {
         console.log('Successfully connected to MongoDB database')
-        const db = client.db(MONGO_DATABASE)
+        const db = client.db('heroku_lbvzlwxj')
 
         // Server side client admin page for creating collections and refreshing scratch data
         app.get('/', async (req,res) => {
