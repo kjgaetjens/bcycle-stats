@@ -31,7 +31,7 @@ const MONGO_URI = process.env.MONGO_URI
 
 
 // Connect to MongoDB (all routes contained within)
-mongo.connect(MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true}, (error,client) => {
+mongo.connect(MONGO_URI, (error,client) => {
     if(!error) {
         console.log('Successfully connected to MongoDB database')
         const db = client.db('heroku_lbvzlwxj')
