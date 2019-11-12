@@ -27,7 +27,7 @@ app.set('view engine','mustache')
 // const MONGO_DATABASE = process.env.MONGO_DATABASE
 
 // MongoDB mLab connection param
-const MONGO_URI = process.env.MONGO_URI
+const MONGO_URI = 'mongodb://heroku_lbvzlwxj:verec9oibrovu3e3gf9or0bfbr@ds033459.mlab.com:33459/heroku_lbvzlwxj'
 
 
 // Connect to MongoDB (all routes contained within)
